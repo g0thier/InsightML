@@ -47,6 +47,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
 import plotly.io as pio
+from io import BytesIO
 
 ## FastAPI requierements
 #
@@ -706,6 +707,8 @@ def select_best_model(list_models, target_dtype, X_train, X_test, Y_train, Y_tes
     for model_info in list_models:
         description, modelML = model_info[0], model_info[1]
 
+        os.system(f'echo "    Predict model {description}..."')
+
         # Cree les predictions
         Y_train_pred = modelML.predict(X_train)
         Y_test_pred = modelML.predict(X_test)
@@ -714,6 +717,8 @@ def select_best_model(list_models, target_dtype, X_train, X_test, Y_train, Y_tes
         score_regression = model_kind_score(target_dtype, description, Y_train, Y_test, Y_train_pred, Y_test_pred)
 
         list_score_model.append(score_regression)
+
+        os.system(f'echo "    ...finish predict model {description}."')
         
 
     # Trie dans l'ordre décroissant et prend le plus grand
@@ -776,38 +781,52 @@ def line_of(x, y):
 #_____ _____ _____ _____ _____ #
 
 def affichage(target_dtype, model_type, Y_train, Y_test, show_train_pred, show_test_pred):
-    result_html = ""
 
     # Cible Catégoriel
     if np.issubdtype(target_dtype, np.object_):
+
         conf_matrix_train = confusion_matrix(Y_train, show_train_pred)
         conf_matrix_test = confusion_matrix(Y_test, show_test_pred)
         class_names = Y_test.unique().tolist()
 
-        fig_train = sns.heatmap(conf_matrix_train, annot=True, cmap='Blues', xticklabels=class_names, yticklabels=class_names, fmt='.6g')
-        fig_test = sns.heatmap(conf_matrix_test, annot=True, cmap='Blues', xticklabels=class_names, yticklabels=class_names, fmt='.6g')
+        fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(10, 4))
 
-        result_html += pio.to_html(fig_train, full_html=False, include_plotlyjs='cdn')
-        result_html += pio.to_html(fig_test, full_html=False, include_plotlyjs='cdn')
+        sns.heatmap(conf_matrix_train, annot=True, cmap='Blues', ax=ax1, xticklabels=class_names, yticklabels=class_names, fmt='.6g')
+        ax1.set_xlabel('Predicted')
+        ax1.set_ylabel('True')
+        ax1.set_title('Train Confusion Matrix')
+
+        sns.heatmap(conf_matrix_test, annot=True, cmap='Blues', ax=ax2, xticklabels=class_names, yticklabels=class_names, fmt='.6g')
+        ax2.set_xlabel('Predicted')
+        ax2.set_ylabel('True')
+        ax2.set_title('Test Confusion Matrix')
 
     # Cible Continue
     else:
+        # Visualize the model
         colors = ['rgb(31, 119, 180)', 'rgb(255, 127, 14)', 'rgb(44, 160, 44)']
         fig = make_subplots(rows=1, cols=2)
 
+        # Visualize predictions on training Set
         fig.add_trace(go.Scatter(x=Y_train, y=show_train_pred, mode='markers', name='Training Set', showlegend=False, marker=dict(color=colors[0])), row=1, col=1)
         fig.add_trace(go.Scatter(x=Y_train, y=line_of(Y_train, Y_train), mode='lines', name='Real', line=dict(color=colors[1])), row=1, col=1)
         fig.add_trace(go.Scatter(x=Y_train, y=line_of(Y_train, show_train_pred), mode='lines', name='Predict', line=dict(color=colors[0])), row=1, col=1)
 
+        # Visualize predictions on test Set
         fig.add_trace(go.Scatter(x=Y_test, y=show_test_pred, mode='markers', name='Test Set', showlegend=False, marker=dict(color=colors[0])), row=1, col=2)
         fig.add_trace(go.Scatter(x=Y_test, y=line_of(Y_test, Y_test), mode='lines', name='Real', showlegend=False, line=dict(color=colors[1])), row=1, col=2)
         fig.add_trace(go.Scatter(x=Y_test, y=line_of(Y_test, show_test_pred), mode='lines', name='Predict', showlegend=False, line=dict(color=colors[0])), row=1, col=2)
 
         fig.update_layout(title_text=f"Training Set & Test Set with {model_type}")
 
-        result_html += pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
+    # Sauvegarder le graphique 
+    buffer = BytesIO()
+    fig.savefig(buffer, format='svg')
+    buffer.seek(0)
+    # Récupérer l'image SVG en tant que chaîne de caractères
+    svg_image = buffer.getvalue().decode('utf-8')
 
-    return result_html
+    return svg_image
     
 
 #¨¨¨¨¨ ¨¨¨¨¨ ¨¨¨¨¨ ¨¨¨¨¨ ¨¨¨¨¨ ¨¨¨¨¨#
@@ -832,9 +851,9 @@ def show_collums_availables(filename, data):
 def make_compute(filename, data, target):
     df = dataframe_pipeline(filename, data, target)
     target_dtype, model_type, Y_train, Y_test, show_train_pred, show_test_pred = model_pipeline(df, target)
-    html_file = affichage(target_dtype, model_type, Y_train, Y_test, show_train_pred, show_test_pred)
+    svg_image = affichage(target_dtype, model_type, Y_train, Y_test, show_train_pred, show_test_pred)
 
-    return html_file
+    return svg_image
 
 
 #¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
@@ -1003,7 +1022,7 @@ async def predict_json(file: UploadFile = File(...), filename: str = ""):
 @app.post("/rendu_models/", tags=["Predicts"])
 async def predict_json(file: UploadFile = File(...), filename: str = "", target: str = ""):
     # Process with data
-    html_file = make_compute(filename, file.file, target)
+    svg_image = make_compute(filename, file.file, target)
     # Format response
-    response = {"Resultat": html_file}
+    response = {"Resultat": svg_image}
     return response
