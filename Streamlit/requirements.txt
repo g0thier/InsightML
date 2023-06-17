@@ -1,0 +1,13 @@
+altair
+streamlit
+chardet
+numpy
+pandas_flavor
+imblearn
+sklearn
+matplotlib
+seaborn
+plotly
+pandas
+openpyxl
+kaleido
