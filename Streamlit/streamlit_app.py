@@ -872,8 +872,10 @@ def main():
 
     filename = ''
     file_extension = ''
+    file_path = ''
 
     columns_list = []
+    columns_tuple = ()
 
     target_dtype, model_type, Y_train, Y_test, show_train_pred, show_test_pred = None, None, [], [], [], []
 
@@ -896,33 +898,35 @@ def main():
 
     with st.expander("Select dataset", expanded=True):
         # Upload File:
-        uploaded_file = st.file_uploader("Choose a file :")
+        uploaded_file = st.file_uploader("Choose a file :", type=['csv', 'xls', 'xlsx','xlsm','xlsb', 'json', 'h5', 'data', 'dat','txt'])
 
         if uploaded_file is not None:
-            filename = uploaded_file.name
-            file_extension = os.path.splitext(filename)[1]  # Récupère l'extension du fichier
+            # Rafraichie uniquement si le fichier est différent
+            if filename != uploaded_file.name:
+                try:
+                    os.remove(file_path) # Supprime le fichier en cache 
+                except:
+                    pass
+
+                with st.spinner('Cache the file...'):
+                    filename = uploaded_file.name
+                    file_extension = os.path.splitext(filename)[1]  # Récupère l'extension du fichier
+                    file_data = uploaded_file.read()  # Lire les données du fichier une seule fois
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
+                        tmp_file.write(file_data) # Écrit des données dans le fichier temporaire
+                        file_path = tmp_file.name # Récupère le chemin d'accès au fichier temporaire
+
+                with st.spinner('Wait for columns available...'):    
+                        columns_list = show_collums_availables(filename, file_path)
+                        columns_tuple = tuple([columns_list[-1]] + columns_list[:-1])
+            
         
     with st.expander("Choose target", expanded=True):
+        # Selection de cible :
         st.empty()
-        if uploaded_file is not None:
-            # Transform function:
-            with st.spinner('Wait for columns available...'):
-                file_data = uploaded_file.read()  # Lire les données du fichier une seule fois
-
-                with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-                    # Écrit des données dans le fichier temporaire
-                    tmp_file.write(file_data)
-                    # Récupère le chemin d'accès au fichier temporaire
-                    file_path = tmp_file.name
-                    
-                    columns_list = show_collums_availables(filename, file_path)
-                    columns_tuple = tuple([columns_list[-1]] + columns_list[:-1])
-
-
-            target = st.selectbox(
-                "Which target do you want to predict?",
-                columns_tuple,
-                )
+        if len(columns_tuple) > 0:
+            target = st.selectbox("Which target do you want to predict?", columns_tuple)
             
             st.caption('''This script automatically detects the format of your dataset, 
             drops empty columns, identifies and provides details about dates, 
@@ -931,16 +935,15 @@ def main():
             and random forest models to provide you with the best possible insights.''')
 
             if st.button('Predict'):
+                # Crée la prediction.
                 with st.spinner('ML predicting...'):
-                    # Crée la prediction.
                     df = dataframe_pipeline(filename, file_path, target)
                     target_dtype, model_type, Y_train, Y_test, show_train_pred, show_test_pred = model_pipeline(df, target)
     
     with st.expander("See result", expanded=True):
+        # Affichage des données :
         st.empty()
         if target_dtype is not None:
-            # Affichage des données :
-
             # Cible Catégoriel
             if np.issubdtype(target_dtype, np.object_):
                 
