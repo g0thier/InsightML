@@ -54,6 +54,7 @@ import altair as alt
 import math
 import pandas as pd
 import streamlit as st
+from streamlit import components
 import json
 import tempfile
 
@@ -842,6 +843,29 @@ def show_collums_availables(filename, data):
 # #_____ _____ _____ _____ _____ #  #
 #_____ _____ _____ _____ _____ _____#
 
+html_btn_mobile = '''    
+    <style>
+        @media (orientation: landscape) {
+            .div-only-mobile {
+                visibility: hidden;
+                height: 0;
+            }
+        }
+        
+        @media (orientation: portrait) {
+            .div-only-mobile {
+                visibility: visible;
+                display: inline-block;
+            }
+        }
+    </style>
+
+    <div class="div-only-mobile">
+        <a href="mailto:hello@datahydre.com?subject=New client from Streamlit app&body=Hi Gauthier, I need your help!" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: #fff; text-decoration: none; border-radius: 4px; font-family: Arial, sans-serif; font-size: 16px;">Work with me</a>
+        <a href="mailto:gauthier.rammault@hotmail.fr?subject=OpenToWork&body=Hi Gauthier, I want to hire you!" style="display: inline-block; padding: 10px 20px; background-color: #e91e63; color: #fff; text-decoration: none; border-radius: 4px; font-family: Arial, sans-serif; font-size: 16px;">Hire me</a>
+    </div>
+'''
+
 def main():
 
     st.set_page_config(page_title="ML Dataset", page_icon="🔮", layout="wide")
@@ -962,6 +986,8 @@ def main():
 
                 st.write(fig)
 
+    st.write(html_btn_mobile, unsafe_allow_html=True)
+    st.empty()
     st.caption(''':blue[Beta]: If you have any questions, text me on [LinkedIn](https://www.linkedin.com/in/gauthier-rammault/) or send me an [e-mail](mailto:gauthier.rammault@hotmail.fr).''')
 
 if __name__ == '__main__':
